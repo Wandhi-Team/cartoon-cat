@@ -7,6 +7,8 @@ import logging
 import os
 from os import path as osp
 
+from selenium.webdriver.chrome.options import Options
+
 
 class Enum(tuple):
     __getattr__ = tuple.index
@@ -37,7 +39,10 @@ class CartoonCat:
         if BrowserType.FIREFOX == browser:
             self.__browser = webdriver.Firefox()
         elif BrowserType.CHROME == browser:
-            self.__browser = webdriver.Chrome(driver)
+            # 后台模式
+            option = Options()
+            option.add_argument("headless")
+            self.__browser = webdriver.Chrome(driver, chrome_options=option)
         elif BrowserType.IE == browser:
             self.__browser = webdriver.Ie(driver)
         elif BrowserType.SAFARI == browser:
@@ -65,7 +70,7 @@ class CartoonCat:
         """
 
         self.__browser.get(self.__site)
-        chapter_elem_list = self.__browser.find_elements_by_css_selector('.comic-chapters .list ul li a')
+        chapter_elem_list = self.__browser.find_elements_by_css_selector('#chapter-list-1 a')
         for chapter_elem in chapter_elem_list:
             self.__chapter_list.append((chapter_elem.text, chapter_elem.get_attribute('href')))
 
@@ -108,7 +113,7 @@ class CartoonCat:
 
         logging.info('#### START DOWNLOAD CHAPTER %d %s ####' % (chapter_idx, chapter_title))
 
-        save_folder = osp.join(save_folder, chapter_title)
+        save_folder = osp.join(save_folder, "{}-{}".format(chapter_idx + 1, chapter_title))
         if not osp.exists(save_folder):
             os.mkdir(save_folder)
 
@@ -116,16 +121,19 @@ class CartoonCat:
         self.__browser.get(chapter_url)
 
         while True:
-            image_div = self.__browser.find_element_by_css_selector('mip-img')
+            image_div = self.__browser.find_element_by_css_selector('.chapter-content img')
             image_url = image_div.get_attribute('src')
             save_image_name = osp.join(save_folder, ('%05d' % image_idx) + '.' + osp.basename(image_url).split('.')[-1])
             self.__download(image_url, save_image_name)
-
-            image_div.click()       # 跳转页面
+            logging.info("#### {}:{}下载完成####".format(chapter_title, image_idx + 1))
+            image_div.click()  # 跳转页面
 
             # 页面结束会跳回首页，而首页的url不是html结尾，可用于判断章节是否爬取完。
-            if not self.__browser.current_url.endswith('html'):
+            _cheater_title = self.__browser.find_element_by_css_selector(".BarTit").text
+            if _cheater_title != chapter_title:
                 break
+            # if not self.__browser.current_url.endswith('html'):
+            #     break
             image_idx += 1
 
         logging.info('#### DOWNLOAD CHAPTER COMPLETE ####')
